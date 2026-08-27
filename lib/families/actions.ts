@@ -1,7 +1,9 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
+import { getCurrentMembership } from "@/lib/families/queries";
 
 function friendlyError(message: string): string {
   switch (message) {
@@ -26,6 +28,53 @@ export async function createFamily(formData: FormData): Promise<{ error?: string
   if (error) return { error: friendlyError(error.message) };
 
   redirect("/today");
+}
+
+export async function addFamilyMember(formData: FormData): Promise<{ error?: string }> {
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  if (!displayName) return { error: "Enter a name." };
+
+  const membership = await getCurrentMembership();
+  if (!membership) return { error: "Something went wrong. Please try again." };
+
+  const supabase = await createClient();
+  const { error } = await supabase.from("family_members").insert({
+    family_id: membership.familyId,
+    display_name: displayName,
+    role: "child",
+    profile_id: null,
+  });
+
+  if (error) return { error: "Something went wrong. Please try again." };
+
+  revalidatePath("/family");
+  return {};
+}
+
+export async function renameFamilyMember(formData: FormData): Promise<{ error?: string }> {
+  const memberId = String(formData.get("memberId") ?? "");
+  const displayName = String(formData.get("displayName") ?? "").trim();
+  if (!displayName) return { error: "Enter a name." };
+
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("family_members")
+    .update({ display_name: displayName })
+    .eq("id", memberId);
+
+  if (error) return { error: "Something went wrong. Please try again." };
+
+  revalidatePath("/family");
+  return {};
+}
+
+export async function removeFamilyMember(formData: FormData): Promise<void> {
+  const memberId = String(formData.get("memberId") ?? "");
+
+  const supabase = await createClient();
+  await supabase.from("family_members").delete().eq("id", memberId);
+
+  revalidatePath("/family");
 }
 
 export async function joinFamily(formData: FormData): Promise<{ error?: string }> {

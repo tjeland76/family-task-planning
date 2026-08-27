@@ -41,6 +41,7 @@ describe.skipIf(!url || !anonKey || !serviceRoleKey)("family RLS isolation", () 
   let familyBOwner: SupabaseClient;
   let familyAId: string;
   let taskId: string;
+  let childId: string;
 
   beforeAll(async () => {
     admin = createClient(url!, serviceRoleKey!);
@@ -77,6 +78,14 @@ describe.skipIf(!url || !anonKey || !serviceRoleKey)("family RLS isolation", () 
       .single();
     if (taskError) throw taskError;
     taskId = task!.id;
+
+    const { data: child, error: childError } = await familyAOwner
+      .from("family_members")
+      .insert({ family_id: familyAId, display_name: "RLS test child", role: "child", profile_id: null })
+      .select("id")
+      .single();
+    if (childError) throw childError;
+    childId = child!.id;
   });
 
   afterAll(async () => {
@@ -113,5 +122,42 @@ describe.skipIf(!url || !anonKey || !serviceRoleKey)("family RLS isolation", () 
       .eq("family_id", familyAId);
     expect(error).toBeNull();
     expect(data).toHaveLength(0);
+  });
+
+  it("lets a same-family parent see and rename a child member", async () => {
+    const { data: seen, error: selectError } = await familyAJoiner
+      .from("family_members")
+      .select("id")
+      .eq("id", childId);
+    expect(selectError).toBeNull();
+    expect(seen).toHaveLength(1);
+
+    const { error: updateError } = await familyAJoiner
+      .from("family_members")
+      .update({ display_name: "Renamed by joiner" })
+      .eq("id", childId);
+    expect(updateError).toBeNull();
+  });
+
+  it("does not let a different family see, rename, or delete a child member", async () => {
+    const { data: seen, error: selectError } = await familyBOwner
+      .from("family_members")
+      .select("id")
+      .eq("id", childId);
+    expect(selectError).toBeNull();
+    expect(seen).toHaveLength(0);
+
+    await familyBOwner
+      .from("family_members")
+      .update({ display_name: "Hijacked" })
+      .eq("id", childId);
+    await familyBOwner.from("family_members").delete().eq("id", childId);
+
+    const { data: stillThere } = await admin
+      .from("family_members")
+      .select("display_name")
+      .eq("id", childId)
+      .single();
+    expect(stillThere?.display_name).toBe("Renamed by joiner");
   });
 });
