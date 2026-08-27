@@ -106,6 +106,20 @@ describe.skipIf(!url || !anonKey || !serviceRoleKey)("family RLS isolation", () 
     expect(data).toHaveLength(0);
   });
 
+  it("does not let a different family update the task", async () => {
+    await familyBOwner.from("tasks").update({ title: "Hijacked" }).eq("id", taskId);
+
+    const { data } = await admin.from("tasks").select("title").eq("id", taskId).single();
+    expect(data?.title).toBe("RLS test task");
+  });
+
+  it("does not let a different family delete the task", async () => {
+    await familyBOwner.from("tasks").delete().eq("id", taskId);
+
+    const { data } = await admin.from("tasks").select("id").eq("id", taskId);
+    expect(data).toHaveLength(1);
+  });
+
   it("does not let a different family see family_members rows", async () => {
     const { data, error } = await familyBOwner
       .from("family_members")
