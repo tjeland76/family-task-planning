@@ -56,6 +56,23 @@ export async function getFamilyTasks(familyId: string): Promise<Task[]> {
   return (data as TaskRow[]).map(toTask);
 }
 
+export async function getMemberTasks(familyId: string, memberId: string): Promise<Task[]> {
+  const supabase = await createClient();
+
+  const { data, error } = await supabase
+    .from("tasks")
+    .select(TASK_SELECT)
+    .eq("family_id", familyId)
+    .eq("assigned_to", memberId)
+    .order("status")
+    .order("due_date", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false });
+
+  if (error || !data) return [];
+
+  return (data as TaskRow[]).map(toTask);
+}
+
 export async function getTask(taskId: string): Promise<Task | null> {
   const supabase = await createClient();
 
