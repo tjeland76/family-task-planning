@@ -21,24 +21,27 @@ type Group = { label: string; tasks: Task[] };
 
 export function TaskGroups({ groups, emptyMessage }: { groups: Group[]; emptyMessage: string }) {
   const [state, setState] = useState(() => groups.map((group) => ({ ...group, tasks: [...group.tasks] })));
-  const [undo, setUndo] = useState<{ groupIndex: number; index: number; task: Task } | null>(null);
+  const [undo, setUndo] = useState<{
+    groupIndex: number;
+    index: number;
+    task: Task;
+    completion: Promise<{ nextOccurrenceId: string | null }>;
+  } | null>(null);
   const [, startTransition] = useTransition();
 
   const hasAnyTasks = state.some((group) => group.tasks.length > 0);
 
   function handleComplete(groupIndex: number, task: Task) {
+    const completion = completeTask(task.id);
+
     setState((current) => {
       const next = current.map((group) => ({ ...group, tasks: [...group.tasks] }));
       const index = next[groupIndex].tasks.findIndex((t) => t.id === task.id);
       if (index === -1) return current;
 
       next[groupIndex].tasks.splice(index, 1);
-      setUndo({ groupIndex, index, task });
+      setUndo({ groupIndex, index, task, completion });
       return next;
-    });
-
-    startTransition(async () => {
-      await completeTask(task.id);
     });
 
     setTimeout(() => {
@@ -48,7 +51,7 @@ export function TaskGroups({ groups, emptyMessage }: { groups: Group[]; emptyMes
 
   function handleUndo() {
     if (!undo) return;
-    const { groupIndex, index, task } = undo;
+    const { groupIndex, index, task, completion } = undo;
 
     setState((current) => {
       const next = current.map((group) => ({ ...group, tasks: [...group.tasks] }));
@@ -57,7 +60,8 @@ export function TaskGroups({ groups, emptyMessage }: { groups: Group[]; emptyMes
     });
 
     startTransition(async () => {
-      await uncompleteTask(task.id);
+      const { nextOccurrenceId } = await completion;
+      await uncompleteTask(task.id, nextOccurrenceId);
     });
 
     setUndo(null);
