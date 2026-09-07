@@ -2,11 +2,22 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-);
+let vapidConfigured = false;
+
+// Deferred until first actual send, not run at module load -- otherwise
+// merely *importing* this file (e.g. transitively, from a test that never
+// calls sendPushNotification) crashes in any environment without VAPID env
+// vars configured.
+function ensureVapidConfigured() {
+  if (vapidConfigured) return;
+
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT!,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
+    process.env.VAPID_PRIVATE_KEY!,
+  );
+  vapidConfigured = true;
+}
 
 function getServiceClient() {
   return createClient(
@@ -39,6 +50,8 @@ export async function sendPushNotification({
   url,
   type,
 }: SendPushArgs): Promise<void> {
+  ensureVapidConfigured();
+
   const supabase = getServiceClient();
 
   const { data: preferences } = await supabase

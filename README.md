@@ -1,36 +1,58 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Family Tasks
 
-## Getting Started
+A mobile-first PWA for running family admin: who's doing what, and when it's due. See `PRODUCT_SPEC.md` for the v0.1 product spec and `PRODUCT_SPEC_0-2.md` for the push notifications enhancement.
 
-First, run the development server:
+Stack: Next.js (App Router) + TypeScript + Tailwind CSS + Supabase (Postgres, Auth, Row Level Security), deployed on Vercel via GitHub.
+
+## Getting started
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Environment variables
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Copy `.env.local.example` to `.env.local` and fill these in — the same values need adding to your Vercel project's Environment Variables (Production, Preview, and Development) for the deployed app to work.
 
-## Learn More
+| Variable | Where it comes from |
+|---|---|
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase dashboard → Project Settings → API |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase dashboard → Project Settings → API |
+| `SUPABASE_SERVICE_ROLE_KEY` | Supabase dashboard → Project Settings → API. **Server-only** — bypasses Row Level Security. Never reference it from a client component or anything that runs in the browser bundle. Used only by the push notification code (`lib/notifications/*`), which needs to read one family member's data on another's behalf (e.g. to notify them) or run with no logged-in user at all (the daily due-today job). |
+| `NEXT_PUBLIC_VAPID_PUBLIC_KEY` | Generate with `npx web-push generate-vapid-keys` |
+| `VAPID_PRIVATE_KEY` | Same command as above. **Server-only.** |
+| `VAPID_SUBJECT` | A `mailto:` address or URL identifying who's sending the push, per the Web Push spec — e.g. `mailto:you@example.com` |
+| `CRON_SECRET` | Generate with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"`. Vercel automatically sends this as `Authorization: Bearer <value>` on requests to cron-configured routes once it's set on the project — `/api/cron/due-today` checks it matches before doing anything. |
 
-To learn more about Next.js, take a look at the following resources:
+## Database migrations
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Schema changes live in `supabase/migrations/*.sql`, applied by hand in the Supabase SQL Editor (Project → SQL Editor → paste → run), in filename order. There's no CI/CD step for this — after adding a new migration file, run it against the project yourself before deploying code that depends on it.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Push notifications
 
-## Deploy on Vercel
+Two notification types, per `PRODUCT_SPEC_0-2.md`:
+- **Task assigned** — fires from `createTask`/`updateTask`/`completeTask`'s recurrence branch in `lib/tasks/actions.ts` whenever a task ends up assigned to someone other than the person who created/edited it.
+- **Due today** — a daily summary, once per family member with outstanding tasks due that day. Runs via Vercel Cron (`vercel.json`, hourly) hitting `/api/cron/due-today`, which itself checks whether it's currently 8am in `Europe/London` before doing anything (Vercel Cron only runs in UTC and can't shift for British Summer Time on its own).
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Both go through `lib/notifications/push.ts`'s `sendPushNotification`, which never throws — a failed or disabled notification never blocks the task operation that triggered it, and expired device subscriptions are cleaned up automatically.
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+A user enables notifications from `/settings` — this requests browser permission (only after they click "Enable notifications", never on page load) and registers `public/sw.js` as the service worker.
+
+## Testing
+
+```bash
+npm test
+```
+
+Runs everything except `tests/rls.test.ts`, which is skipped unless `SUPABASE_SERVICE_ROLE_KEY` (and the Supabase URL/anon key) are present in the environment — it's a live integration test against a real Supabase project, not mocks, so it's opt-in rather than part of the default run:
+
+```bash
+node --env-file=.env.local node_modules/.bin/vitest run
+```
+
+## Deployment
+
+Push to `main` → Vercel builds and deploys automatically (GitHub integration, no manual step). The Vercel Cron job is picked up from `vercel.json` on deploy; check the project's Cron Jobs tab to confirm it's registered.
