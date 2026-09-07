@@ -135,15 +135,15 @@ export function NotificationSettings({
               {subscriptions.map((subscription) => (
                 <div
                   key={subscription.id}
-                  className="flex items-center justify-between rounded-xl border border-slate-200 p-3"
+                  className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3"
                 >
-                  <span className="truncate text-sm text-slate-600">
+                  <span className="min-w-0 flex-1 truncate text-sm text-slate-600">
                     {subscription.userAgent ?? "Unknown device"}
                   </span>
                   <button
                     type="button"
                     onClick={() => handleRemoveDevice(subscription.id)}
-                    className="text-sm font-medium text-red-600 underline"
+                    className="shrink-0 text-sm font-medium text-red-600 underline"
                   >
                     Remove
                   </button>
