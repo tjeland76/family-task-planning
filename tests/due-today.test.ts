@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildDueTodaySummaries } from "@/lib/notifications/rules";
-import { isReminderHour } from "@/lib/notifications/due-today";
+import { getTodayInFamilyTimezone } from "@/lib/notifications/due-today";
 
 const TODAY = "2026-08-20";
 
@@ -47,20 +47,14 @@ describe("buildDueTodaySummaries", () => {
   });
 });
 
-describe("isReminderHour (DST correctness)", () => {
-  it("is true at 08:00 UTC in January (GMT, UTC+0 -> 8am London)", () => {
-    expect(isReminderHour(new Date("2026-01-15T08:00:00Z"))).toBe(true);
+describe("getTodayInFamilyTimezone (DST correctness)", () => {
+  it("uses the UTC date directly in winter (GMT, UTC+0)", () => {
+    expect(getTodayInFamilyTimezone(new Date("2026-01-15T23:30:00Z"))).toBe("2026-01-15");
   });
 
-  it("is true at 07:00 UTC in July (BST, UTC+1 -> 8am London)", () => {
-    expect(isReminderHour(new Date("2026-07-15T07:00:00Z"))).toBe(true);
-  });
-
-  it("is false at 08:00 UTC in July (BST, UTC+1 -> 9am London, not 8am)", () => {
-    expect(isReminderHour(new Date("2026-07-15T08:00:00Z"))).toBe(false);
-  });
-
-  it("is false outside the reminder hour entirely", () => {
-    expect(isReminderHour(new Date("2026-01-15T14:00:00Z"))).toBe(false);
+  it("rolls over to the next day late in the evening during BST (UTC+1)", () => {
+    // 23:30 UTC in July is 00:30 the next day in London -- a naive UTC-date
+    // read would get this wrong.
+    expect(getTodayInFamilyTimezone(new Date("2026-07-15T23:30:00Z"))).toBe("2026-07-16");
   });
 });

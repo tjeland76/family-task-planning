@@ -35,7 +35,7 @@ Schema changes live in `supabase/migrations/*.sql`, applied by hand in the Supab
 
 Two notification types, per `PRODUCT_SPEC_0-2.md`:
 - **Task assigned** — fires from `createTask`/`updateTask`/`completeTask`'s recurrence branch in `lib/tasks/actions.ts` whenever a task ends up assigned to someone other than the person who created/edited it.
-- **Due today** — a daily summary, once per family member with outstanding tasks due that day. Runs via Vercel Cron (`vercel.json`, hourly) hitting `/api/cron/due-today`, which itself checks whether it's currently 8am in `Europe/London` before doing anything (Vercel Cron only runs in UTC and can't shift for British Summer Time on its own).
+- **Due today** — a daily summary, once per family member with outstanding tasks due that day. Runs via Vercel Cron (`vercel.json`) hitting `/api/cron/due-today` once a day at `07:00 UTC`. Vercel's Hobby plan caps cron jobs at once per day, which rules out the more precise "fire hourly and check whether it's actually 8am in `Europe/London`" approach — `07:00 UTC` lands on 8am London during British Summer Time (the longer part of the year) and 7am during GMT, a deliberate small seasonal drift rather than a bug. Upgrading to Vercel Pro would allow a more frequent, always-exactly-8am version if that trade-off ever matters enough.
 
 Both go through `lib/notifications/push.ts`'s `sendPushNotification`, which never throws — a failed or disabled notification never blocks the task operation that triggered it, and expired device subscriptions are cleaned up automatically.
 

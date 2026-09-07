@@ -9,22 +9,6 @@ export function getTodayInFamilyTimezone(date: Date = new Date()): string {
   return new Intl.DateTimeFormat("en-CA", { timeZone: FAMILY_TIMEZONE }).format(date);
 }
 
-/**
- * Whether it's currently 8am in the family's timezone. Vercel Cron only
- * runs in UTC and can't shift itself for BST, so the cron fires hourly and
- * this decides whether to actually do anything -- correct across the DST
- * boundary without a timezone library.
- */
-export function isReminderHour(date: Date = new Date()): boolean {
-  const hour = new Intl.DateTimeFormat("en-GB", {
-    timeZone: FAMILY_TIMEZONE,
-    hour: "numeric",
-    hour12: false,
-  }).format(date);
-
-  return Number(hour) === 8;
-}
-
 function getServiceClient() {
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
