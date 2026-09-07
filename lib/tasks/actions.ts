@@ -5,7 +5,35 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { getCurrentMembership } from "@/lib/families/queries";
 import { computeNextDueDate } from "@/lib/tasks/recurrence";
+import { shouldNotifyAssignment } from "@/lib/notifications/rules";
+import { sendPushNotification } from "@/lib/notifications/push";
 import type { Recurrence } from "@/lib/tasks/types";
+
+async function notifyAssignment({
+  createdBy,
+  assignedTo,
+  actorDisplayName,
+  taskId,
+}: {
+  createdBy: string;
+  assignedTo: string | null;
+  actorDisplayName: string;
+  taskId: string;
+}) {
+  if (!shouldNotifyAssignment({ createdBy, assignedTo })) return;
+
+  try {
+    await sendPushNotification({
+      recipientFamilyMemberId: assignedTo!,
+      title: "Family Tasks",
+      body: `${actorDisplayName} assigned you a task`,
+      url: `/tasks/${taskId}`,
+      type: "task_assigned",
+    });
+  } catch (err) {
+    console.error("assignment notification failed", err);
+  }
+}
 
 function revalidateTaskViews() {
   revalidatePath("/today");
@@ -39,18 +67,29 @@ export async function createTask(formData: FormData): Promise<{ error?: string }
   if (!membership) return { error: "Something went wrong. Please try again." };
 
   const supabase = await createClient();
-  const { error } = await supabase.from("tasks").insert({
-    family_id: membership.familyId,
-    created_by: membership.familyMemberId,
-    title: fields.title,
-    assigned_to: fields.assignedTo,
-    due_date: fields.dueDate,
-    recurrence: fields.recurrence,
-    description: fields.description,
-    category_id: fields.categoryId,
-  });
+  const { data: newTask, error } = await supabase
+    .from("tasks")
+    .insert({
+      family_id: membership.familyId,
+      created_by: membership.familyMemberId,
+      title: fields.title,
+      assigned_to: fields.assignedTo,
+      due_date: fields.dueDate,
+      recurrence: fields.recurrence,
+      description: fields.description,
+      category_id: fields.categoryId,
+    })
+    .select("id")
+    .single();
 
   if (error) return { error: "Something went wrong. Please try again." };
+
+  await notifyAssignment({
+    createdBy: membership.familyMemberId,
+    assignedTo: fields.assignedTo,
+    actorDisplayName: membership.displayName,
+    taskId: newTask.id,
+  });
 
   redirect("/today");
 }
@@ -60,7 +99,17 @@ export async function updateTask(formData: FormData): Promise<{ error?: string }
   const fields = parseTaskFields(formData);
   if (!fields.title) return { error: "Enter what needs doing." };
 
+  const membership = await getCurrentMembership();
+  if (!membership) return { error: "Something went wrong. Please try again." };
+
   const supabase = await createClient();
+
+  const { data: existingTask } = await supabase
+    .from("tasks")
+    .select("assigned_to")
+    .eq("id", taskId)
+    .single();
+
   const { error } = await supabase
     .from("tasks")
     .update({
@@ -74,6 +123,15 @@ export async function updateTask(formData: FormData): Promise<{ error?: string }
     .eq("id", taskId);
 
   if (error) return { error: "Something went wrong. Please try again." };
+
+  if (fields.assignedTo !== existingTask?.assigned_to) {
+    await notifyAssignment({
+      createdBy: membership.familyMemberId,
+      assignedTo: fields.assignedTo,
+      actorDisplayName: membership.displayName,
+      taskId,
+    });
+  }
 
   redirect("/today");
 }
@@ -127,6 +185,15 @@ export async function completeTask(taskId: string): Promise<{ nextOccurrenceId: 
           .single();
 
         nextOccurrenceId = nextTask?.id ?? null;
+
+        if (nextOccurrenceId) {
+          await notifyAssignment({
+            createdBy: membership.familyMemberId,
+            assignedTo: task.assigned_to,
+            actorDisplayName: membership.displayName,
+            taskId: nextOccurrenceId,
+          });
+        }
       }
     }
   }
