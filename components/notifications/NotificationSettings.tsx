@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useTransition } from "react";
+import clsx from "clsx";
 import {
   subscribeToPush,
   unsubscribeFromPush,
@@ -14,6 +15,51 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
   const base64 = (base64String + padding).replace(/-/g, "+").replace(/_/g, "/");
   const rawData = atob(base64);
   return Uint8Array.from([...rawData].map((char) => char.charCodeAt(0)));
+}
+
+// A custom switch rather than a native <input type="checkbox"> -- iOS
+// Safari's native checkbox can render at its own much larger intrinsic
+// size regardless of explicit width/height, which was pushing these rows
+// past the edge of the screen. Matches the "style everything ourselves"
+// approach already used for the assignee chips in TaskForm.tsx.
+function ToggleSwitch({
+  label,
+  defaultChecked,
+  onChange,
+}: {
+  label: string;
+  defaultChecked: boolean;
+  onChange: (checked: boolean) => void;
+}) {
+  const [checked, setChecked] = useState(defaultChecked);
+
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 p-3">
+      <span className="min-w-0 flex-1 text-sm text-slate-900">{label}</span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={checked}
+        aria-label={label}
+        onClick={() => {
+          const next = !checked;
+          setChecked(next);
+          onChange(next);
+        }}
+        className={clsx(
+          "relative h-6 w-11 shrink-0 rounded-full transition-colors",
+          checked ? "bg-slate-900" : "bg-slate-300",
+        )}
+      >
+        <span
+          className={clsx(
+            "absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white transition-transform",
+            checked && "translate-x-5",
+          )}
+        />
+      </button>
+    </div>
+  );
 }
 
 export function NotificationSettings({
@@ -108,24 +154,16 @@ export function NotificationSettings({
         </div>
       ) : (
         <div className="space-y-4">
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
-            <span className="text-sm text-slate-900">Task assigned to me</span>
-            <input
-              type="checkbox"
-              defaultChecked={preferences.taskAssignedEnabled}
-              onChange={(event) => handleToggle("taskAssignedEnabled", event.target.checked)}
-              className="h-5 w-5"
-            />
-          </div>
-          <div className="flex items-center justify-between rounded-xl border border-slate-200 p-3">
-            <span className="text-sm text-slate-900">Tasks due today</span>
-            <input
-              type="checkbox"
-              defaultChecked={preferences.dueTodayEnabled}
-              onChange={(event) => handleToggle("dueTodayEnabled", event.target.checked)}
-              className="h-5 w-5"
-            />
-          </div>
+          <ToggleSwitch
+            label="Task assigned to me"
+            defaultChecked={preferences.taskAssignedEnabled}
+            onChange={(checked) => handleToggle("taskAssignedEnabled", checked)}
+          />
+          <ToggleSwitch
+            label="Tasks due today"
+            defaultChecked={preferences.dueTodayEnabled}
+            onChange={(checked) => handleToggle("dueTodayEnabled", checked)}
+          />
 
           {subscriptions.length > 0 && (
             <div className="space-y-2">
