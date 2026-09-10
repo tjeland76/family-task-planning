@@ -28,8 +28,8 @@ export function SignupForm() {
         required
       />
       <FormMessage error={state?.error} message={state?.message} />
-      <Button type="submit" disabled={pending}>
-        {pending ? "Creating account…" : "Create account"}
+      <Button type="submit" loading={pending} loadingText="Creating account…">
+        Create account
       </Button>
     </form>
   );

@@ -23,8 +23,8 @@ export function LoginForm() {
         required
       />
       <FormMessage error={state?.error} />
-      <Button type="submit" disabled={pending}>
-        {pending ? "Logging in…" : "Log in"}
+      <Button type="submit" loading={pending} loadingText="Signing in…">
+        Log in
       </Button>
     </form>
   );

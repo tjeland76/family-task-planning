@@ -24,7 +24,13 @@ export default async function AddTaskPage() {
         <h1 className="text-lg font-semibold text-slate-900">Add Task</h1>
         <span className="w-6" aria-hidden="true" />
       </div>
-      <TaskForm action={createTask} members={parents} categories={categories} submitLabel="Add Task" />
+      <TaskForm
+        action={createTask}
+        members={parents}
+        categories={categories}
+        submitLabel="Add Task"
+        loadingText="Adding…"
+      />
     </main>
   );
 }

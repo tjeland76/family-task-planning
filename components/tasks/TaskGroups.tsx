@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { completeTask, uncompleteTask } from "@/lib/tasks/actions";
 import type { Task } from "@/lib/tasks/types";
@@ -28,10 +28,17 @@ export function TaskGroups({ groups, emptyMessage }: { groups: Group[]; emptyMes
     completion: Promise<{ nextOccurrenceId: string | null }>;
   } | null>(null);
   const [, startTransition] = useTransition();
+  const completingIds = useRef(new Set<string>());
 
   const hasAnyTasks = state.some((group) => group.tasks.length > 0);
 
   function handleComplete(groupIndex: number, task: Task) {
+    // Guards against a test harness (or a very fast double-tap) firing two
+    // click events before the splice below removes the row -- the row
+    // disappearing is the primary defense, this is the explicit backstop.
+    if (completingIds.current.has(task.id)) return;
+    completingIds.current.add(task.id);
+
     const completion = completeTask(task.id);
 
     setState((current) => {
@@ -52,6 +59,8 @@ export function TaskGroups({ groups, emptyMessage }: { groups: Group[]; emptyMes
   function handleUndo() {
     if (!undo) return;
     const { groupIndex, index, task, completion } = undo;
+
+    completingIds.current.delete(task.id);
 
     setState((current) => {
       const next = current.map((group) => ({ ...group, tasks: [...group.tasks] }));

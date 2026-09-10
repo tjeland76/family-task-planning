@@ -40,6 +40,7 @@ export default async function TaskDetailPage({
         categories={categories}
         defaultValues={task}
         submitLabel="Save"
+        loadingText="Saving…"
       />
       <div className="mt-6 text-center">
         <DeleteTaskButton taskId={task.id} title={task.title} />

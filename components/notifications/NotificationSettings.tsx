@@ -77,6 +77,7 @@ export function NotificationSettings({
   );
   const [registrationFailed, setRegistrationFailed] = useState(false);
   const [enabling, setEnabling] = useState(false);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
@@ -117,8 +118,11 @@ export function NotificationSettings({
   }
 
   function handleRemoveDevice(id: string) {
+    if (removingId) return;
+    setRemovingId(id);
     startTransition(async () => {
       await unsubscribeFromPush(id);
+      setRemovingId(null);
     });
   }
 
@@ -147,8 +151,8 @@ export function NotificationSettings({
           </p>
           {error && <p className="mt-2 text-sm text-red-600">{error}</p>}
           <div className="mt-3">
-            <Button type="button" onClick={handleEnable} disabled={enabling}>
-              {enabling ? "Enabling…" : "Enable notifications"}
+            <Button type="button" onClick={handleEnable} loading={enabling} loadingText="Enabling…">
+              Enable notifications
             </Button>
           </div>
         </div>
@@ -181,9 +185,11 @@ export function NotificationSettings({
                   <button
                     type="button"
                     onClick={() => handleRemoveDevice(subscription.id)}
-                    className="shrink-0 text-sm font-medium text-red-600 underline"
+                    disabled={removingId !== null}
+                    aria-busy={removingId === subscription.id}
+                    className="shrink-0 text-sm font-medium text-red-600 underline disabled:opacity-50"
                   >
-                    Remove
+                    {removingId === subscription.id ? "Removing…" : "Remove"}
                   </button>
                 </div>
               ))}

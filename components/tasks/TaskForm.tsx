@@ -15,12 +15,14 @@ export function TaskForm({
   categories,
   defaultValues,
   submitLabel,
+  loadingText,
 }: {
   action: (formData: FormData) => Promise<{ error?: string }>;
   members: Member[];
   categories: Category[];
   defaultValues?: Task;
   submitLabel: string;
+  loadingText: string;
 }) {
   const dateInputRef = useRef<HTMLInputElement>(null);
 
@@ -158,8 +160,8 @@ export function TaskForm({
 
       <FormMessage error={state?.error} />
 
-      <Button type="submit" disabled={pending}>
-        {pending ? "Saving…" : submitLabel}
+      <Button type="submit" loading={pending} loadingText={loadingText}>
+        {submitLabel}
       </Button>
     </form>
   );

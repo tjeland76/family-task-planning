@@ -1,19 +1,34 @@
 "use client";
 
+import { useTransition } from "react";
 import { deleteTask } from "@/lib/tasks/actions";
+import { Button } from "@/components/ui/Button";
 
 export function DeleteTaskButton({ taskId, title }: { taskId: string; title: string }) {
+  const [isDeleting, startTransition] = useTransition();
+
   return (
     <form
-      action={deleteTask}
       onSubmit={(event) => {
-        if (!confirm(`Delete "${title}"?`)) event.preventDefault();
+        event.preventDefault();
+        if (!confirm(`Delete "${title}"?`)) return;
+
+        const formData = new FormData(event.currentTarget);
+        startTransition(async () => {
+          await deleteTask(formData);
+        });
       }}
     >
       <input type="hidden" name="taskId" value={taskId} />
-      <button type="submit" className="text-sm font-medium text-red-600 underline">
+      <Button
+        type="submit"
+        variant="secondary"
+        loading={isDeleting}
+        loadingText="Deleting…"
+        className="text-red-600"
+      >
         Delete task
-      </button>
+      </Button>
     </form>
   );
 }
